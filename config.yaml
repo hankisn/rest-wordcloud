@@ -17,5 +17,5 @@
   'size_function': 'linear', # one of linear, sqrt, sqrtinverse
   # 'size_function': 'sqrt', # one of linear, sqrt, sqrtinverse
   # 'size_function': 'sqrtinverse', # one of linear, sqrt, sqrtinverse
-  'debug': false
+  'debug': true
 }

@@ -13,10 +13,9 @@ import (
 	"runtime/pprof"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/psykhi/wordclouds"
 	"gopkg.in/yaml.v2"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	wordclass "rest-wordcloud/class"
 )
@@ -72,8 +71,8 @@ var DefaultConf = Conf{
 }
 
 func main() {
-
 	const file string = "./db/wordCount.db"
+
 	db, err := sql.Open("sqlite3", file)
 
 	if err != nil {
@@ -107,6 +106,9 @@ func main() {
 		}
 		words = append(words, todoRow...)
 	}
+
+	fmt.Println("Siste ord er: " + words[0].Word)
+
 	//return words
 
 	flag.Parse()
