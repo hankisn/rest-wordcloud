@@ -7,12 +7,14 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"runtime/pprof"
+	"regexp"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psykhi/wordclouds"
 	"gopkg.in/yaml.v2"
@@ -24,6 +26,7 @@ var path = flag.String("input", "input.yaml", "path to flat YAML like {\"word\":
 var config = flag.String("config", "config.yaml", "path to config file")
 var output = flag.String("output", "./output/output.png", "path to output image")
 var cpuprofile = flag.String("cpuprofile", "profile", "write cpu profile to file")
+var sqlpath = flag.String("sqlpath", "./db/wordCount.db", "path to sqlite database")
 
 var DefaultColors = []color.RGBA{
 	{0x1b, 0x1b, 0x1b, 0xff},
@@ -70,74 +73,155 @@ var DefaultConf = Conf{
 	Debug: false,
 }
 
-func main() {
-	const file string = "./db/wordCount.db"
+func postWord(context *gin.Context) {
+	var newWord wordclass.Words
 
-	db, err := sql.Open("sqlite3", file)
+	inputWord := context.Param("inputWord")
+
+	if addWordToDb(inputWord, *sqlpath) {
+		context.IndentedJSON(http.StatusCreated, newWord)
+	} else {
+		context.IndentedJSON(http.StatusBadRequest, "Error adding word")
+	}
+}
+
+func addWordToDb(wordToAdd string, filename string) bool {
+	// TODO: Check if the file exists
+	db, err := sql.Open("sqlite3", filename)
 
 	if err != nil {
 		panic(err)
 	}
 
-	dbQuery := "SELECT * FROM wordcount"
+	var validChars = regexp.MustCompile(`[A-z]`)
+	//TODO: drop 401 if word doesn't compile
+	var cleanWord string
 
+	fmt.Println(validChars.MatchString(wordToAdd))
+
+	if validChars.MatchString(wordToAdd) == true {
+		cleanWord = wordToAdd
+	} else {
+		return false
+	}
+
+	var dbWord string
+	var dbCount int
+
+	dbQuery := fmt.Sprintf("SELECT * FROM wordcount WHERE word = '%s' LIMIT 1", cleanWord)
 	rows, err := db.Query(dbQuery)
 
 	if err != nil {
 		panic(err)
 	}
 
+	//var noRows = false
+
 	defer rows.Close()
-	var words = []wordclass.Words{}
-	for rows.Next() {
-		var word string
-		var count int
 
-		err = rows.Scan(&word, &count)
-		if err != nil {
-			panic(err)
-		}
-
-		var todoRow = []wordclass.Words{
-			{
-				Word:  word,
-				Count: count,
-			},
-		}
-		words = append(words, todoRow...)
+	if err == sql.ErrNoRows {
+		return insertNewWord(cleanWord, filename)
+	} else {
+		rows.Next()
+		rows.Scan(&dbWord, &dbCount)
+		rows.Close()
+		return updateWordCount(dbWord, dbCount, filename)
 	}
 
-	fmt.Println("Siste ord er: " + words[0].Word)
+	//return false
+}
 
-	//return words
+func updateWordCount(word string, count int, filename string) bool {
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Ka e det vi har med oss? %s - %v\n", word, count)
+
+	dbQuery := fmt.Sprintf("UPDATE wordcount SET count = %v WHERE word = '%s'", count+1, word)
+	fmt.Printf("Ka kjøre vi: %s", dbQuery)
+	_, err = db.Exec(dbQuery)
+
+	if err != nil {
+		panic(err)
+	}
+	return true
+}
+
+func insertNewWord(word string, filename string) bool {
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		panic(err)
+	}
+
+	dbQuery := fmt.Sprintf("INSERT INTO wordcount (word, count) VALUES ('%s', %v)", word, 1)
+	_, err = db.Exec(dbQuery)
+	if err != nil {
+		panic(err)
+	}
+	return true
+}
+
+func main() {
+
+	router := gin.Default()
+	router.SetTrustedProxies([]string{"192.168.1.0/24"})
+	//	router.GET("/cloud", publishWordcloud)
+	router.GET("/word/:inputWord", postWord)
+	router.Run("0.0.0.0:9090")
+
+	var file string
+	if *sqlpath != "" {
+		file = "./db/wordCount.db"
+	} else {
+		file = *sqlpath
+	}
+
+	var dbWords []wordclass.Words = getWordsFromDb(file)
+
+	if len(dbWords) <= 0 {
+		log.Fatal("Database empty, no wordclout without words.....")
+		panic("Database empty, no wordclout without words.....")
+	}
 
 	flag.Parse()
-
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
+	/*
+		if *cpuprofile != "" {
+			f, err := os.Create(*cpuprofile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.StartCPUProfile(f)
+			defer pprof.StopCPUProfile()
 		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
-	// Load words
-	content, err := os.ReadFile(*path)
-	if err != nil {
-		panic(err)
-	}
+	*/
 	inputWords := make(map[string]int, 0)
-	err = yaml.Unmarshal(content, &inputWords)
-	if err != nil {
-		panic(err)
-	}
 
+	for _, value := range dbWords {
+		fmt.Printf("Word: %s - Count: %v\n", value.Word, value.Count)
+		inputWords[value.Word] = value.Count
+	}
+	/*
+		if len(dbWords) <= 0 {
+			// Load words from yaml-file
+			wordContent, err := os.ReadFile(*path)
+			if err != nil {
+				panic(err)
+			}
+			err = yaml.Unmarshal(wordContent, &inputWords)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+
+		}
+	*/
 	// Load config
 	conf := DefaultConf
-	content, err = os.ReadFile(*config)
+	configContent, err := os.ReadFile(*config)
 	if err == nil {
-		err = yaml.Unmarshal(content, &conf)
+		err = yaml.Unmarshal(configContent, &conf)
 		if err != nil {
 			fmt.Printf("Failed to decode config, using defaults instead: %s\n", err)
 		}
@@ -198,4 +282,43 @@ func main() {
 	// Don't forget to close files
 	outputFile.Close()
 	fmt.Printf("Done in %v\n", time.Since(start))
+}
+
+func getWordsFromDb(filename string) []wordclass.Words {
+	// TODO: Check if the file exists
+	db, err := sql.Open("sqlite3", filename)
+
+	if err != nil {
+		panic(err)
+	}
+
+	dbQuery := "SELECT * FROM wordcount"
+
+	rows, err := db.Query(dbQuery)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer rows.Close()
+	var words = []wordclass.Words{}
+	for rows.Next() {
+		var word string
+		var count int
+
+		err = rows.Scan(&word, &count)
+		if err != nil {
+			panic(err)
+		}
+
+		var todoRow = []wordclass.Words{
+			{
+				Word:  word,
+				Count: count,
+			},
+		}
+		words = append(words, todoRow...)
+	}
+
+	return words
 }
