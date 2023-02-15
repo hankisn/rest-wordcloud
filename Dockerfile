@@ -33,6 +33,7 @@ RUN chown -R 1001:1001 /rest-app
 USER 1001:1001
 
 COPY ./fonts/ ./fonts/
+COPY ./images/favicon.ico ./images/favicon.ico
 COPY --from=build /app/scripts/build_database.sh ./scripts/build_database.sh
 COPY --from=build /app/scripts/schema.sql ./scripts/schema.sql
 

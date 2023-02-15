@@ -1,9 +1,17 @@
 # rest-wordcloud
-Rest-service to provide a wordcloud in Golang
+Rest-service to provide a wordcloud in Golang. It uses a SQLite database located in the `db`-folder inside the container. There are not persistant storage for the database(by design).
 
 ## Requirements
-### SQLite
-Uses a SQLite database located in the `db`-folder.
+### Docker
+Tested with Docker version: 23.0.1.
 
-## TODO
- - Change the main to a class so that another main can use it
+## Usage
+### Build
+Build with the following command:
+```
+docker build -t wordcloud .
+```
+### Example run
+```
+docker run -it --rm -p 9090:9090 --name cloud wordcloud
+```

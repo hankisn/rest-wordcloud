@@ -56,8 +56,8 @@ type MaskConf struct {
 }
 
 var DefaultConf = Conf{
-	FontMaxSize:     350,
-	FontMinSize:     5,
+	FontMaxSize:     300, //700
+	FontMinSize:     4,   // 10
 	RandomPlacement: false,
 	FontFile:        "./fonts/roboto/Roboto-Regular.ttf",
 	Colors:          DefaultColors,
@@ -79,11 +79,11 @@ func postWord(context *gin.Context) {
 	inputWord := context.Param("inputWord")
 
 	if addWordToDb(inputWord, *sqlpath) {
+		publishWordcloud(context)
 		context.IndentedJSON(http.StatusCreated, newWord)
 	} else {
 		context.IndentedJSON(http.StatusBadRequest, "Error adding word")
 	}
-	publishWordcloud(context)
 }
 
 func addWordToDb(wordToAdd string, filename string) bool {
@@ -94,15 +94,17 @@ func addWordToDb(wordToAdd string, filename string) bool {
 		panic(err)
 	}
 
-	var validChars = regexp.MustCompile(`[A-z]`)
+	var validChars = regexp.MustCompile(`\W+`)
 	//TODO: drop 401 if word doesn't compile
 	var cleanWord string
 
 	fmt.Println(validChars.MatchString(wordToAdd))
 
-	if validChars.MatchString(wordToAdd) == true {
+	if validChars.MatchString(wordToAdd) == false {
+		fmt.Println("Ordet inneholder ingen dritt")
 		cleanWord = wordToAdd
 	} else {
+		fmt.Println("Ordet inneholder bare DRITT!!!")
 		return false
 	}
 
