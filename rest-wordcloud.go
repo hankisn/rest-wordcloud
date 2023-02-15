@@ -24,7 +24,7 @@ import (
 
 var path = flag.String("input", "input.yaml", "path to flat YAML like {\"word\":42,...}")
 var config = flag.String("config", "config.yaml", "path to config file")
-var output = flag.String("output", "./output/output.png", "path to output image")
+var output = flag.String("output", "./images/cloud.png", "path to output image")
 var cpuprofile = flag.String("cpuprofile", "profile", "write cpu profile to file")
 var sqlpath = flag.String("sqlpath", "./db/wordCount.db", "path to sqlite database")
 
@@ -56,14 +56,14 @@ type MaskConf struct {
 }
 
 var DefaultConf = Conf{
-	FontMaxSize:     700,
-	FontMinSize:     10,
+	FontMaxSize:     350,
+	FontMinSize:     5,
 	RandomPlacement: false,
 	FontFile:        "./fonts/roboto/Roboto-Regular.ttf",
 	Colors:          DefaultColors,
 	BackgroundColor: color.RGBA{255, 255, 255, 255},
-	Width:           4096,
-	Height:          4096,
+	Width:           2048,
+	Height:          2048,
 	Mask: MaskConf{"", color.RGBA{
 		R: 0,
 		G: 0,
@@ -83,6 +83,7 @@ func postWord(context *gin.Context) {
 	} else {
 		context.IndentedJSON(http.StatusBadRequest, "Error adding word")
 	}
+	publishWordcloud(context)
 }
 
 func addWordToDb(wordToAdd string, filename string) bool {
@@ -110,25 +111,28 @@ func addWordToDb(wordToAdd string, filename string) bool {
 
 	dbQuery := fmt.Sprintf("SELECT * FROM wordcount WHERE word = '%s' LIMIT 1", cleanWord)
 	rows, err := db.Query(dbQuery)
-
 	if err != nil {
 		panic(err)
 	}
 
 	//var noRows = false
 
-	defer rows.Close()
+	fmt.Printf("Ordet er: %s\n", cleanWord)
 
-	if err == sql.ErrNoRows {
-		return insertNewWord(cleanWord, filename)
-	} else {
-		rows.Next()
+	if rows.Next() {
+		//
+		fmt.Println("Den her finnes fra før.")
 		rows.Scan(&dbWord, &dbCount)
 		rows.Close()
+		db.Close()
 		return updateWordCount(dbWord, dbCount, filename)
+	} else {
+		//
+		fmt.Println("Denne var ny gitt.")
+		rows.Close()
+		db.Close()
+		return insertNewWord(cleanWord, filename)
 	}
-
-	//return false
 }
 
 func updateWordCount(word string, count int, filename string) bool {
@@ -137,12 +141,10 @@ func updateWordCount(word string, count int, filename string) bool {
 		panic(err)
 	}
 
-	fmt.Printf("Ka e det vi har med oss? %s - %v\n", word, count)
-
 	dbQuery := fmt.Sprintf("UPDATE wordcount SET count = %v WHERE word = '%s'", count+1, word)
-	fmt.Printf("Ka kjøre vi: %s", dbQuery)
+	fmt.Printf("Ka kjøre vi: %s\n", dbQuery)
+	defer db.Close()
 	_, err = db.Exec(dbQuery)
-
 	if err != nil {
 		panic(err)
 	}
@@ -156,6 +158,7 @@ func insertNewWord(word string, filename string) bool {
 	}
 
 	dbQuery := fmt.Sprintf("INSERT INTO wordcount (word, count) VALUES ('%s', %v)", word, 1)
+	defer db.Close()
 	_, err = db.Exec(dbQuery)
 	if err != nil {
 		panic(err)
@@ -167,10 +170,14 @@ func main() {
 
 	router := gin.Default()
 	router.SetTrustedProxies([]string{"192.168.1.0/24"})
-	//	router.GET("/cloud", publishWordcloud)
+	//router.GET("/generate", publishWordcloud)
 	router.GET("/word/:inputWord", postWord)
+	//router.StaticFile("/favicon.ico", "./images/favicon.ico")
+	router.StaticFile("/cloud", "./images/cloud.png")
 	router.Run("0.0.0.0:9090")
+}
 
+func publishWordcloud(context *gin.Context) {
 	var file string
 	if *sqlpath != "" {
 		file = "./db/wordCount.db"
@@ -181,8 +188,8 @@ func main() {
 	var dbWords []wordclass.Words = getWordsFromDb(file)
 
 	if len(dbWords) <= 0 {
-		log.Fatal("Database empty, no wordclout without words.....")
-		panic("Database empty, no wordclout without words.....")
+		log.Fatal("Database empty, no wordcloud without words.....")
+		panic("Database empty, no wordcloud without words.....")
 	}
 
 	flag.Parse()
@@ -199,7 +206,6 @@ func main() {
 	inputWords := make(map[string]int, 0)
 
 	for _, value := range dbWords {
-		fmt.Printf("Word: %s - Count: %v\n", value.Word, value.Count)
 		inputWords[value.Word] = value.Count
 	}
 	/*
@@ -281,7 +287,9 @@ func main() {
 
 	// Don't forget to close files
 	outputFile.Close()
-	fmt.Printf("Done in %v\n", time.Since(start))
+
+	context.IndentedJSON(http.StatusCreated, fmt.Sprintf("Done in %v", time.Since(start)))
+
 }
 
 func getWordsFromDb(filename string) []wordclass.Words {

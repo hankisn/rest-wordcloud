@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS wordcount;
+
+CREATE TABLE wordcount(
+    word STRING NOT NULL PRIMARY KEY,
+    count INTEGER NOT NULL
+)
