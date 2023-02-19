@@ -8,7 +8,7 @@ COPY go.mod ./
 COPY go.sum ./
 COPY ./class/* ./class/
 COPY ./fonts/ ./fonts/
-COPY ./scripts/* ./scripts/
+#COPY ./scripts/* ./scripts/
 COPY ./*.go ./
 COPY ./*.yaml ./
 COPY ./*.png ./
@@ -34,14 +34,18 @@ USER 1001:1001
 
 COPY ./fonts/ ./fonts/
 COPY ./images/favicon.ico ./images/favicon.ico
-COPY --from=build /app/scripts/build_database.sh ./scripts/build_database.sh
-COPY --from=build /app/scripts/schema.sql ./scripts/schema.sql
+COPY ./scripts/build_database.sh ./scripts/build_database.sh
+COPY ./scripts/schema.sql ./scripts/schema.sql
+COPY ./assets/index.html ./index.html
 
 RUN ./scripts/build_database.sh
 RUN sqlite3 "./db/wordCount.db" < ./scripts/schema.sql
 
 COPY --from=build /app/restserver ./restserver
 
-EXPOSE 80
+ARG NEW_LISTEN_PORT=9090
+ENV LISTEN_PORT=$NEW_LISTEN_PORT
+
+EXPOSE $LISTEN_PORT
 
 CMD ["./restserver"]

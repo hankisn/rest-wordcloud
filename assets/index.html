@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Ordsky</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+        <script>
+            $(document).ready(function(){
+                $("#addWordBtn").click(function(){
+                    //$(this).hide();
+                    //alert($("#wordToAdd").val());
+                    $.ajax(
+                        {
+                            url: "/add/" + $("#wordToAdd").val(),
+                            crossDomain: true,
+                        })
+                        .done(function(data) {
+                            console.log("No har æ lagt det til...");
+                            location.reload();
+                        })
+                        .always(function () {
+                            console.log("Always");
+                        });
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <h2>Ordsky</h2>
+        <p>Skriv inn ordet du vil ha inn i skyen:</p>
+        <form>
+            <input id="wordToAdd" type="text"/><input type="button" id="addWordBtn" value="Legg til ord"/>
+        </form>
+        <img id="wordcloud" src="/cloud" />
+    </body>
+</html>

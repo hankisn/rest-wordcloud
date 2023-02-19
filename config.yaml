@@ -1,6 +1,6 @@
 {
-  'font_max_size': 100,
-  'font_min_size': 10,
+  'font_max_size': 200, # 100
+  'font_min_size': 3, # 10
   'font_file': './fonts/SourceSans3-Regular.ttf',
   'width': 1024,
   'height': 1024,

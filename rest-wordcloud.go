@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,8 @@ var config = flag.String("config", "config.yaml", "path to config file")
 var output = flag.String("output", "./images/cloud.png", "path to output image")
 var cpuprofile = flag.String("cpuprofile", "profile", "write cpu profile to file")
 var sqlpath = flag.String("sqlpath", "./db/wordCount.db", "path to sqlite database")
+
+var listenPort = os.Getenv("LISTEN_PORT")
 
 var DefaultColors = []color.RGBA{
 	{0x1b, 0x1b, 0x1b, 0xff},
@@ -56,14 +59,14 @@ type MaskConf struct {
 }
 
 var DefaultConf = Conf{
-	FontMaxSize:     300, //700
-	FontMinSize:     4,   // 10
+	FontMaxSize:     200, //300 //700
+	FontMinSize:     3,   //4 // 10
 	RandomPlacement: false,
 	FontFile:        "./fonts/roboto/Roboto-Regular.ttf",
 	Colors:          DefaultColors,
 	BackgroundColor: color.RGBA{255, 255, 255, 255},
-	Width:           2048,
-	Height:          2048,
+	Width:           1024, //2048
+	Height:          1024, //2048
 	Mask: MaskConf{"", color.RGBA{
 		R: 0,
 		G: 0,
@@ -79,6 +82,7 @@ func postWord(context *gin.Context) {
 	inputWord := context.Param("inputWord")
 
 	if addWordToDb(inputWord, *sqlpath) {
+		newWord.Word = inputWord
 		publishWordcloud(context)
 		context.IndentedJSON(http.StatusCreated, newWord)
 	} else {
@@ -95,7 +99,6 @@ func addWordToDb(wordToAdd string, filename string) bool {
 	}
 
 	var validChars = regexp.MustCompile(`\W+`)
-	//TODO: drop 401 if word doesn't compile
 	var cleanWord string
 
 	fmt.Println(validChars.MatchString(wordToAdd))
@@ -116,8 +119,6 @@ func addWordToDb(wordToAdd string, filename string) bool {
 	if err != nil {
 		panic(err)
 	}
-
-	//var noRows = false
 
 	fmt.Printf("Ordet er: %s\n", cleanWord)
 
@@ -168,15 +169,30 @@ func insertNewWord(word string, filename string) bool {
 	return true
 }
 
-func main() {
+func startUpMsg() {
+	fmt.Println("")
+	fmt.Println("__        __            _  ____ _                 _ ")
+	fmt.Println("\\ \\      / /__  _ __ __| |/ ___| | ___  _   _  __| |")
+	fmt.Println(" \\ \\ /\\ / / _ \\| '__/ _` | |   | |/ _ \\| | | |/ _` |")
+	fmt.Println("  \\ V  V / (_) | | | (_| | |___| | (_) | |_| | (_| |")
+	fmt.Println("   \\_/\\_/ \\___/|_|  \\__,_|\\____|_|\\___/ \\__,_|\\__,_|")
+	fmt.Println("")
+}
 
+func main() {
+	startUpMsg()
+	var serverPort = 9090
+	if port, err := strconv.Atoi(listenPort); err == nil {
+		if port > 0 && port <= 65353 {
+			serverPort = port
+		}
+	}
 	router := gin.Default()
 	router.SetTrustedProxies([]string{"192.168.1.0/24"})
-	//router.GET("/generate", publishWordcloud)
-	router.GET("/word/:inputWord", postWord)
-	//router.StaticFile("/favicon.ico", "./images/favicon.ico")
+	router.GET("/add/:inputWord", postWord)
 	router.StaticFile("/cloud", "./images/cloud.png")
-	router.Run("0.0.0.0:9090")
+	router.StaticFile("/", "./index.html")
+	router.Run("0.0.0.0:" + fmt.Sprintf("%v", serverPort))
 }
 
 func publishWordcloud(context *gin.Context) {
@@ -210,21 +226,7 @@ func publishWordcloud(context *gin.Context) {
 	for _, value := range dbWords {
 		inputWords[value.Word] = value.Count
 	}
-	/*
-		if len(dbWords) <= 0 {
-			// Load words from yaml-file
-			wordContent, err := os.ReadFile(*path)
-			if err != nil {
-				panic(err)
-			}
-			err = yaml.Unmarshal(wordContent, &inputWords)
-			if err != nil {
-				panic(err)
-			}
-		} else {
 
-		}
-	*/
 	// Load config
 	conf := DefaultConf
 	configContent, err := os.ReadFile(*config)
@@ -290,7 +292,7 @@ func publishWordcloud(context *gin.Context) {
 	// Don't forget to close files
 	outputFile.Close()
 
-	context.IndentedJSON(http.StatusCreated, fmt.Sprintf("Done in %v", time.Since(start)))
+	fmt.Printf("Done in %v", time.Since(start))
 
 }
 
