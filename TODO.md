@@ -3,6 +3,8 @@
 - Returnere melding om reglene for ord
 - Fjerne Config-filen og la all config være i koden
 - Default-bilde som gir beskjed om at en må skrive inn ord
+- Lage et reset-endepunkt
+- Lage et endepunkt for å fjerne enkelte ord
 
 ```
 docker build -t wordcloud .
