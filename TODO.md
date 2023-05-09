@@ -1,4 +1,6 @@
 # Todolist
+- Ser ut som det er et problem med forsiden etter update til 1.9.0 av gin, må sjekkes ut!
+- Ser ut som png-fila har feil referanse i dockerfila.... ihvertfall cloud.png i images....
 - Sjekke om database-fil eksisterer
 - Returnere melding om reglene for ord
 - Fjerne Config-filen og la all config være i koden
