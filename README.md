@@ -15,6 +15,3 @@ docker build -t wordcloud .
 ```
 docker run -it --rm -p 9090:9090 --name cloud wordcloud
 ```
-
-## Update all packages
-go get -u
